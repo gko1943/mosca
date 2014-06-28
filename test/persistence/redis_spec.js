@@ -103,6 +103,54 @@ describe("mosca.persistence.Redis", function() {
       });
     });
   });
+
+  describe("packet expire", function() {
+
+    var redisClient = redis.createClient();
+
+    function mock_expire(key, cb) {
+      return redisClient.del(key, cb);
+    }
+
+    it("expire packet should be delete", function(done) {
+      var client = {
+        id: "my client id - 46",
+        clean: false,
+        subscriptions: {
+          "hello/#": {
+            qos: 1
+          }
+        }
+      };
+
+      var packet = {
+        topic: "hello/46",
+        qos: 0,
+        payload: new Buffer("world"),
+        messageId: 46
+      },
+      packet2 = {
+        topic: "hello/47",
+        qos: 0,
+        payload: new Buffer("world"),
+        messageId: 47
+      };
+
+      var that = this;
+      that.instance.storeSubscriptions(client, function() {
+        that.instance.storeOfflinePacket(packet, function(err) {
+          that.instance.storeOfflinePacket(packet2, function(err) {
+            mock_expire("packets:" + client.id + ":" + packet2.messageId, function(err, result) {
+              that.instance.streamOfflinePackets(client, function(err, p) {
+                expect(p).to.eql(packet);
+                done();
+              });
+            });
+          });
+        });
+      });
+    });
+  });
 });
 
 describe("mosca.persistence.Redis select database", function() {
